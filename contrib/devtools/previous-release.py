@@ -10,8 +10,8 @@ import subprocess
 import sys
 
 def usage(args, extras):
-    print("Usage: ./previous_release.py [options] tag1 tag2")
-    print("Specify release tag(s), e.g.: .previous_release v0.15.1")
+    print('Usage: {} [options] tag1 [tag2..tagN]'.format(sys.argv[0]))
+    print('Specify release tag(s), e.g.: {} v0.15.1'.format(sys.argv[0]))
     return 0
 
 @contextlib.contextmanager
@@ -91,6 +91,8 @@ def build_release(tag, args):
         ]
         for cmd in cmds:
             ret = subprocess.call(cmd.split())
+            if ret:
+                return ret
         # Move binaries, so they're in the same place as in the
         # release download
         Path('bin').mkdir(exist_ok=True)
@@ -104,17 +106,18 @@ def build_release(tag, args):
 def check_host(args):
     args.host = os.environ.get('HOST', subprocess.check_output(
                                 './depends/config.guess').decode())
-    platforms = {
-        'x86_64-*-linux*': 'x86_64-linux-gnu',
-        'x86_64-apple-darwin*': 'osx64',
-    }
-    args.platform = ''
-    for pattern, target in platforms.items():
-        if fnmatch(args.host, pattern):
-            args.platform = target
-    if not args.platform:
-        print('Not sure which binary to download for {}'.format(host))
-        return 1
+    if args.download_binary:
+        platforms = {
+            'x86_64-*-linux*': 'x86_64-linux-gnu',
+            'x86_64-apple-darwin*': 'osx64',
+        }
+        args.platform = ''
+        for pattern, target in platforms.items():
+            if fnmatch(args.host, pattern):
+                args.platform = target
+        if not args.platform:
+            print('Not sure which binary to download for {}'.format(args.host))
+            return 1
     return 0
 
 def main(args, extras):
@@ -122,10 +125,10 @@ def main(args, extras):
         return usage(args, extras)
     if not Path(args.target_dir).is_dir():
         Path(args.target_dir).mkdir(exist_ok=True, parents=True)
+    print("Releases directory: {}".format(args.target_dir))
     ret = check_host(args)
     if ret:
         return ret
-    print("Releases directory: {}".format(args.target_dir))
     if args.download_binary:
         with pushd(args.target_dir):
             for tag in extras:
